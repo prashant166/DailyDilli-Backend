@@ -1,11 +1,14 @@
 const express = require("express");
-const dotenv = require("dotenv");
+require("dotenv").config();
 const { Sequelize } = require("sequelize");
 const bodyParser = require("body-parser");
 const userRoutes = require("./routes/userRoutes");
+const placeRoutes = require("./routes/placeRoutes");
+const placeMediaRoutes = require("./routes/placeMediaRoutes");
 
 // Load environment variables
-dotenv.config();
+
+console.log("🔹 JWT_SECRET:", process.env.JWT_SECRET);
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -18,6 +21,8 @@ app.use(bodyParser.json());
 
 // Use "/api/users" as the base route
 app.use("/api/users", userRoutes);
+app.use("/api/places", placeRoutes);
+app.use("/api/media", placeMediaRoutes);
 
 // Database Connection
 const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USERNAME, process.env.DB_PASSWORD, {

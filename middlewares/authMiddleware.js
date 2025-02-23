@@ -1,23 +1,32 @@
-"use strict";
+const jwt = require("jsonwebtoken");
+const { User } = require("../models");
 
-const express = require("express");
-const router = express.Router();
-const placeController = require("../controllers/placeController");
-// const authMiddleware = require("../middleware/authMiddleware"); // Ensure this middleware checks for authentication
+const secretKey = process.env.JWT_SECRET || "dh8923h83hjd9j2sj9pj29j";
 
-// 📌 Create a new place (Only logged-in users)
-router.post("/places", /*authMiddleware, */ placeController.createPlace);
+const authMiddleware = async (req, res, next) => {
+  try {
+    const token = req.header("Authorization")?.split(" ")[1];
+    if (!token) {
+      return res.status(401).json({ error: "No token, authorization denied" });
+    }
 
-// 📌 Get all approved places
-router.get("/places", placeController.getPlaces);
+    const decoded = jwt.verify(token, secretKey);
+    if (!decoded) {
+      return res.status(401).json({ error: "Invalid token" });
+    }
 
-// 📌 Get places by category
-router.get("/places/category/:category", placeController.getPlacesByCategory);
+    const user = await User.findByPk(decoded.id);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
 
-// 📌 Update a place (Only the original contributor or an admin)
-router.put("/places/:id",  /*authMiddleware, */ placeController.updatePlace);
+    req.user = user; // ✅ Attach user to req object
+    console.log("Authenticated User:", req.user); // Debugging log
+    next();
+  } catch (error) {
+    console.error("Auth Middleware Error:", error);
+    return res.status(401).json({ error: "Authorization failed" });
+  }
+};
 
-// 📌 Delete a place (Only the original contributor or an admin)
-router.delete("/places/:id",  /*authMiddleware, */ placeController.deletePlace);
-
-module.exports = router;
+module.exports = authMiddleware;

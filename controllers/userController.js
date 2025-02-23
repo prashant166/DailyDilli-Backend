@@ -4,7 +4,8 @@ const { User } = require("../models");
 const { Op } = require("sequelize");
 
 const saltRounds = 10;
-const secretKey = process.env.JWT_SECRET || "your_secret_key";
+const secretKey = process.env.JWT_SECRET;
+console.log("🔐 JWT_SECRET:", secretKey);
 const TOKEN_EXPIRY = "24h"; // Token expires in 24 hours
 
 /**

@@ -5,14 +5,16 @@ const sharp = require("sharp");
 const path = require("path");
 const fs = require("fs");
 
-// Set up storage destination for original images
+// Set up storage destination (only one "uploads" directory)
+const uploadDir = path.join(__dirname, "../uploads");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// Multer storage configuration (store files in "uploads" directory)
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadPath = path.join(__dirname, "../uploads/originals");
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-    }
-    cb(null, uploadPath);
+    cb(null, uploadDir); // Store directly in "uploads"
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
@@ -20,7 +22,7 @@ const storage = multer.diskStorage({
   },
 });
 
-// Multer filter to accept only images
+// Multer file filter (accept only images)
 const imageFilter = (req, file, cb) => {
   const allowedExtensions = [".png", ".jpg", ".jpeg", ".webp"];
   const ext = path.extname(file.originalname).toLowerCase();
@@ -31,45 +33,42 @@ const imageFilter = (req, file, cb) => {
   }
 };
 
-// Multer upload configuration
+// Multer upload middleware
 const upload = multer({
   storage,
   fileFilter: imageFilter,
   limits: { fileSize: 5 * 1024 * 1024 }, // Limit file size to 5MB
 });
 
-// Compress and resize image before storing
-const compressImage = async (filePath, outputDir) => {
-  const compressedPath = path.join(outputDir, path.basename(filePath));
-  await sharp(filePath)
-    .resize(800) // Resize width to 800px (maintain aspect ratio)
-    .webp({ quality: 80 }) // Convert to WebP with 80% quality
-    .toFile(compressedPath);
-
-  return compressedPath;
-};
-
-// Middleware for handling image upload & compression
+// Compress and resize image before storing (overwrite original)
 const handleImageUpload = async (req, res, next) => {
-  if (!req.file) return next(); // No file uploaded
+  if (!req.files || req.files.length === 0) return next(); // No files uploaded
 
   try {
-    const compressedDir = path.join(__dirname, "../uploads/compressed");
-    if (!fs.existsSync(compressedDir)) {
-      fs.mkdirSync(compressedDir, { recursive: true });
+    for (let file of req.files) {
+      const compressedPath = path.join(uploadDir, file.filename); // Overwrite in same folder
+
+      // Compress & convert image to WebP
+      await sharp(file.path)
+        .resize(800) // Resize width to 800px
+        .webp({ quality: 80 }) // Convert to WebP with 80% quality
+        .toFile(compressedPath);
+
+      // Remove the original file after compression
+      if (file.path !== compressedPath) {
+        fs.unlinkSync(file.path);
+      }
+
+      // Update file path reference
+      file.compressedPath = compressedPath;
     }
-
-    // Compress the image
-    const compressedImagePath = await compressImage(req.file.path, compressedDir);
-
-    // Store compressed image info in request for further processing
-    req.file.compressedPath = compressedImagePath;
 
     next();
   } catch (error) {
-    console.error("Error compressing image:", error);
+    console.error("Error compressing images:", error);
     return res.status(500).json({ error: "Image compression failed" });
   }
 };
+
 
 module.exports = { upload, handleImageUpload };
