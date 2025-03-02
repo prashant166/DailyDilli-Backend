@@ -1,7 +1,6 @@
 "use strict";
 
 const multer = require("multer");
-const sharp = require("sharp");
 const path = require("path");
 const fs = require("fs");
 
@@ -33,42 +32,11 @@ const imageFilter = (req, file, cb) => {
   }
 };
 
-// Multer upload middleware
+// Multer upload middleware (no compression)
 const upload = multer({
   storage,
   fileFilter: imageFilter,
   limits: { fileSize: 5 * 1024 * 1024 }, // Limit file size to 5MB
 });
 
-// Compress and resize image before storing (overwrite original)
-const handleImageUpload = async (req, res, next) => {
-  if (!req.files || req.files.length === 0) return next(); // No files uploaded
-
-  try {
-    for (let file of req.files) {
-      const compressedPath = path.join(uploadDir, file.filename); // Overwrite in same folder
-
-      // Compress & convert image to WebP
-      await sharp(file.path)
-        .resize(800) // Resize width to 800px
-        .webp({ quality: 80 }) // Convert to WebP with 80% quality
-        .toFile(compressedPath);
-
-      // Remove the original file after compression
-      if (file.path !== compressedPath) {
-        fs.unlinkSync(file.path);
-      }
-
-      // Update file path reference
-      file.compressedPath = compressedPath;
-    }
-
-    next();
-  } catch (error) {
-    console.error("Error compressing images:", error);
-    return res.status(500).json({ error: "Image compression failed" });
-  }
-};
-
-
-module.exports = { upload, handleImageUpload };
+module.exports = { upload };

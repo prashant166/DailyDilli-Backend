@@ -1,5 +1,5 @@
 "use strict";
-const { Place, User } = require("../models");
+const { Place, User, Category } = require("../models");
 
 // 📌 Create a new place
 const createPlace = async (req, res) => {
@@ -7,7 +7,7 @@ const createPlace = async (req, res) => {
     const { id: user_id } = req.user; // Get user ID from auth middleware
     const {
       name,
-      category,
+      category_id,
       description,
       location,
       latitude,
@@ -20,11 +20,17 @@ const createPlace = async (req, res) => {
       images,
     } = req.body;
 
+     // Check if category exists
+     const category = await Category.findByPk(category_id);
+     if (!category) {
+       return res.status(400).json({ error: "Invalid category ID" });
+     }
+
     // Create the place with default 'approved' status
     const place = await Place.create({
       user_id,
       name,
-      category,
+      category_id,
       description,
       location,
       latitude,
@@ -50,7 +56,11 @@ const getPlaces = async (req, res) => {
   try {
     const places = await Place.findAll({
       where: { status: "approved" },
-      include: { model: User, as: "user", attributes: ["id", "first_name", "last_name", "email"] },
+      include: [
+        { model: User, as: "user", attributes: ["id", "first_name", "last_name", "email"] },
+        { model: Category, as: "category", attributes: ["id", "name"] },
+      ],
+      
     });
 
     return res.status(200).json({ places });
@@ -63,16 +73,19 @@ const getPlaces = async (req, res) => {
 // 📌 Get places by category
 const getPlacesByCategory = async (req, res) => {
   try {
-    const { category } = req.params;
+    const { category_id } = req.params;
 
     const places = await Place.findAll({
-      where: { category, status: "approved" },
-      include: { model: User, as: "user", attributes: ["id", "first_name", "last_name", "email"] },
+      where: { category_id, status: "approved" },
+      include: [
+        { model: User, as: "user", attributes: ["id", "first_name", "last_name", "email"] },
+        { model: Category, as: "category", attributes: ["id", "name"] },
+      ],
     });
 
     return res.status(200).json({ places });
   } catch (error) {
-    console.error("Error fetching places by category:", error);
+    console.error("Error fetching places by category_id:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -82,6 +95,7 @@ const updatePlace = async (req, res) => {
   try {
     const { id: user_id, role } = req.user; // Get logged-in user ID & role
     const { id } = req.params;
+    const { category_id } = req.body;
     const place = await Place.findByPk(id);
 
     if (!place) {
@@ -92,6 +106,14 @@ const updatePlace = async (req, res) => {
     if (place.user_id !== user_id && role !== "admin") {
       return res.status(403).json({ error: "Unauthorized to update this place" });
     }
+
+       // Validate category ID if provided
+       if (category_id) {
+        const category = await Category.findByPk(category_id);
+        if (!category) {
+          return res.status(400).json({ error: "Invalid category ID" });
+        }
+      }
 
     await place.update(req.body);
 

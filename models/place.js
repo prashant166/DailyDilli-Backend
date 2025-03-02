@@ -9,6 +9,10 @@ module.exports = (sequelize) => {
         foreignKey: "user_id",
         as: "user",
       });
+      Place.belongsTo(models.Category, {
+        foreignKey: "category_id",
+        as: "category",
+      });
     }
   }
 
@@ -23,20 +27,14 @@ module.exports = (sequelize) => {
         type: DataTypes.STRING,
         allowNull: false,
       },
-      category: {
-        type: DataTypes.ENUM(
-          "Historical",
-          "Cafe",
-          "Adventure",
-          "Romantic",
-          "Shopping",
-          "Religious",
-          "Cultural",
-          "Entertainment",
-          "Nightlife",
-          "Family-friendly"
-        ),
+      category_id: {
+        type: DataTypes.INTEGER,
         allowNull: false,
+        references: {
+          model: "Category", // Explicit reference to "Category"
+          key: "id",
+        },
+        onDelete: "CASCADE",
       },
       description: {
         type: DataTypes.TEXT,
@@ -81,7 +79,7 @@ module.exports = (sequelize) => {
       },
       user_id: {
         type: DataTypes.INTEGER,
-        allowNull: false,
+        allowNull: true,
         references: {
           model: "User",
           key: "id",
