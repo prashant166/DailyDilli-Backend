@@ -1,21 +1,23 @@
 const { Client } = require("@opensearch-project/opensearch");
-const AWS = require("aws-sdk");
-const createAwsOpensearchConnector = require("aws-opensearch-connector");
-
 require("dotenv").config();
-console.log("AWS_ACCESS_KEY_ID:", process.env.AWS_ACCESS_KEY_ID); // Debugging
-console.log("AWS_SECRET_ACCESS_KEY:", process.env.AWS_SECRET_ACCESS_KEY);
 
-// Configure AWS SDK with IAM credentials
-const awsConfig = new AWS.Config({
-  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  region: process.env.AWS_REGION || "us-east-1",
-});
+const isLocal = process.env.NODE_ENV !== "production"; // Check if running locally
 
 const opensearchClient = new Client({
-  node: "https://vpc-mydailydilli-2utwiovpbawnw5tmwtkj25l3hu.us-east-1.es.amazonaws.com",
-  ...createAwsOpensearchConnector(awsConfig), // AWS Signature V4 authentication
+  node: isLocal ? "http://localhost:9200" : process.env.OPENSEARCH_URL, // Use local ES in dev mode
+  ...(isLocal
+    ? {} // No auth for local
+    : {
+        auth: {
+          username: process.env.OS_USERNAME || "", // For AWS OpenSearch
+          password: process.env.OS_PASSWORD || "",
+        },
+        ssl: {
+          rejectUnauthorized: false, // Avoid SSL issues
+        },
+      }),
 });
+
+console.log("Connected to OpenSearch:", isLocal ? "Local" : "AWS");
 
 module.exports = opensearchClient;

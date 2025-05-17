@@ -5,6 +5,11 @@ const bodyParser = require("body-parser");
 const userRoutes = require("./routes/userRoutes");
 const placeRoutes = require("./routes/placeRoutes");
 const placeMediaRoutes = require("./routes/placeMediaRoutes");
+const searchRoutes = require("./routes/searchRoutes");
+const categoryRoutes = require("./routes/categoryRoutes");
+const likedPlacesRoutes = require("./routes/likedPlacesRoutes");
+const itineraryRoute = require("./routes/itineraryRoutes");
+const submitSafetyFeedbackRoute = require("./routes/safetyFeedbackRoute")
 
 // Load environment variables
 
@@ -23,6 +28,11 @@ app.use(bodyParser.json());
 app.use("/api/users", userRoutes);
 app.use("/api/places", placeRoutes);
 app.use("/api/media", placeMediaRoutes);
+app.use("/api/search", searchRoutes);
+app.use("/api/categories", categoryRoutes);
+app.use("/api/likedplaces", likedPlacesRoutes);
+app.use("/api/itinerary", itineraryRoute);
+app.use("/api/safetyfeedback", submitSafetyFeedbackRoute);
 
 // Database Connection
 const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USERNAME, process.env.DB_PASSWORD, {

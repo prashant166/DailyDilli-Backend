@@ -1,7 +1,7 @@
 const { Model, DataTypes } = require("sequelize");
 
 module.exports = (sequelize) => {
-  class User extends Model {}
+  class User extends Model { }
 
   User.init(
     {
@@ -33,6 +33,11 @@ module.exports = (sequelize) => {
         type: DataTypes.STRING,
         defaultValue: "user", // Default role
       },
+      gender: {
+        type: DataTypes.ENUM("male", "female", "other"),
+        allowNull: true,
+      },
+
     },
     {
       sequelize,

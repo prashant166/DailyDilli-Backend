@@ -14,7 +14,7 @@ const TOKEN_EXPIRY = "24h"; // Token expires in 24 hours
 const getUsers = async (req, res) => {
   try {
     const users = await User.findAll({
-      attributes: ["id", "first_name", "last_name", "email", "travelling_since", "role", "createdAt"],
+      attributes: ["id", "first_name", "last_name", "email", "travelling_since", "role", "gender", "createdAt"],
     });
 
     res.status(200).json({ users });
@@ -32,7 +32,7 @@ const getUserById = async (req, res) => {
 
   try {
     const user = await User.findByPk(userId, {
-      attributes: ["id", "first_name", "last_name", "email", "travelling_since", "role", "createdAt"],
+      attributes: ["id", "first_name", "last_name", "email", "travelling_since", "role","gender", "createdAt"],
     });
 
     if (!user) return res.status(404).json({ error: "User not found" });
@@ -48,10 +48,10 @@ const getUserById = async (req, res) => {
  * @desc User Registration (Sign Up)
  */
 const signUp = async (req, res) => {
-  const { first_name, last_name, email, password, travelling_since } = req.body;
+  const { first_name, last_name, email, password, travelling_since, gender } = req.body;
 
   try {
-    if (!first_name || !last_name || !email || !password) {
+    if (!first_name || !last_name || !email || !password || !gender) {
       return res.status(400).json({ error: "All fields are required" });
     }
 
@@ -69,6 +69,7 @@ const signUp = async (req, res) => {
       email,
       password: hashedPassword,
       travelling_since,
+      gender,
       role: "user",
     });
 
@@ -112,7 +113,7 @@ const signIn = async (req, res) => {
  */
 const updateUser = async (req, res) => {
   const userId = parseInt(req.params.id, 10);
-  const { first_name, last_name, travelling_since } = req.body;
+  const { first_name, last_name, travelling_since, gender } = req.body;
 
   try {
     const user = await User.findByPk(userId);
@@ -122,6 +123,7 @@ const updateUser = async (req, res) => {
     if (first_name) user.first_name = first_name;
     if (last_name) user.last_name = last_name;
     if (travelling_since) user.travelling_since = travelling_since;
+    if (gender) user.gender = gender;
 
     await user.save();
 

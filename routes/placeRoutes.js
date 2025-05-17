@@ -20,4 +20,6 @@ router.put("/:id", authMiddleware, placeController.updatePlace);
 // 📌 Delete a place (Only the original contributor or an admin)
 router.delete("/:id", authMiddleware, placeController.deletePlace);
 
+router.get("/:id", placeController.getPlaceById)
+
 module.exports = router;
