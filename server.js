@@ -1,5 +1,6 @@
 const express = require("express");
 require("dotenv").config();
+const cors = require("cors");
 const { Sequelize } = require("sequelize");
 const bodyParser = require("body-parser");
 const userRoutes = require("./routes/userRoutes");
@@ -15,11 +16,14 @@ const submitSafetyFeedbackRoute = require("./routes/safetyFeedbackRoute")
 
 console.log("🔹 JWT_SECRET:", process.env.JWT_SECRET);
 
+
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(express.json());
+app.use(cors()); 
 
 // Middleware
 app.use(bodyParser.json());

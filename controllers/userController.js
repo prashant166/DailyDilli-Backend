@@ -97,16 +97,33 @@ const signIn = async (req, res) => {
     if (!isValidPassword) return res.status(400).json({ error: "Invalid email or password" });
 
     // Generate JWT token
-    const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, secretKey, {
-      expiresIn: TOKEN_EXPIRY,
-    });
+    const token = jwt.sign(
+      { id: user.id, email: user.email, role: user.role },
+      secretKey,
+      { expiresIn: TOKEN_EXPIRY }
+    );
 
-    res.status(200).json({ message: "Sign in successful", token });
+    // Prepare safe user data
+    const userData = {
+      id: user.id,
+      first_name: user.first_name,
+      last_name: user.last_name,
+      email: user.email,
+      travelling_since: user.travelling_since,
+      gender: user.gender,
+    };
+
+    res.status(200).json({
+      message: "Sign in successful",
+      token,
+      userData,
+    });
   } catch (error) {
     console.error("Error signing in:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 };
+
 
 /**
  * @desc Update User
