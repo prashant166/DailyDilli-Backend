@@ -105,6 +105,7 @@ const signIn = async (req, res) => {
 
     // Prepare safe user data
     const userData = {
+      token: token,
       id: user.id,
       first_name: user.first_name,
       last_name: user.last_name,
