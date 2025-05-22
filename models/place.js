@@ -59,14 +59,16 @@ module.exports = (sequelize) => {
       budget_per_head: {
         type: DataTypes.ENUM("Low", "Medium", "High", "Luxury"),
         allowNull: false,
+        defaultValue: "Medium",
       },
       entry_fee: {
         type: DataTypes.DECIMAL(10, 2),
         allowNull: true,
       },
       best_time_to_visit: {
-        type: DataTypes.ENUM("Morning", "Afternoon", "Evening", "Night"),
+        type: DataTypes.ENUM("Morning", "Afternoon", "Evening", "Night", "DayTime"),
         allowNull: false,
+        defaultValue: "DayTime",
       },
       parking_available: {
         type: DataTypes.BOOLEAN,
