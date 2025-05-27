@@ -46,121 +46,131 @@ const indexPlaces = async (req, res) => {
 };
 
 // 📌 Search for places in OpenSearch
+
 const searchPlaces = async (req, res) => {
   try {
-    const { query, category, budget_per_head, tags, parking_available, best_time_to_visit } = req.query;
+    const {
+      query,
+      category,
+      budget_per_head,
+      tags,
+      parking_available,
+      best_time_to_visit,
+    } = req.query;
 
-    const mustQueries = [];
+    const mustFilters = [];
+    if (category) mustFilters.push({ match: { category } });
+    if (budget_per_head) mustFilters.push({ match: { budget_per_head } });
+    if (best_time_to_visit) mustFilters.push({ match: { best_time_to_visit } });
 
+    if (parking_available !== undefined) {
+      mustFilters.push({
+        match: { parking_available: parking_available === "true" },
+      });
+    }
+
+    if (tags) {
+      mustFilters.push({ terms: { tags: tags.split(",") } });
+    }
+
+    const shouldQueries = [];
     let searchKeywords = [];
 
     if (query) {
-      // 🌟 Expand search using Gemini AI
-      searchKeywords = await expandQueryWithAI(query);
-
-      console.log("Expanded keywords:", searchKeywords);
-
-      const contradictoryPairs = [
-        ["luxury", "budget-friendly"],
-        ["peaceful", "crowded"], 
-      ];
-      
-      for (const [a, b] of contradictoryPairs) {
-        if (searchKeywords.includes(a) && searchKeywords.includes(b)) {
-          searchKeywords = searchKeywords.filter(tag => tag !== a); 
-        }
-      }
-      
-
-      if (searchKeywords.includes("luxury") && searchKeywords.includes("budget-friendly")) {
-        searchKeywords = searchKeywords.filter(tag => tag !== "luxury");
-      }
-      
-
-      mustQueries.push({
-        multi_match: {
-          query: query,
-          fields: ["name", "description", "tags"],
-          fuzziness: "AUTO",
+      shouldQueries.push({
+        match_phrase: {
+          name: {
+            query,
+            boost: 8,
+          },
         },
       });
 
+      shouldQueries.push({
+        multi_match: {
+          query,
+          fields: ["name^3", "description", "tags"],
+          fuzziness: "AUTO",
+          boost: 2,
+        },
+      });
 
-      // Boost results based on expanded keywords
+      searchKeywords = await expandQueryWithAI(query);
+
+      const contradictoryPairs = [
+        ["luxury", "budget-friendly"],
+        ["peaceful", "crowded"],
+      ];
+      for (const [a, b] of contradictoryPairs) {
+        if (searchKeywords.includes(a) && searchKeywords.includes(b)) {
+          searchKeywords = searchKeywords.filter((t) => t !== a);
+        }
+      }
+
       if (searchKeywords.length) {
-        mustQueries.push({
-          terms: {
-            tags: searchKeywords,
-          },
+        shouldQueries.push({
+          terms: { tags: searchKeywords },
         });
       }
     }
 
-
-
-
-    // Optional filters
-    if (category) {
-      mustQueries.push({ match: { category } });
-    }
-
-    if (budget_per_head) {
-      mustQueries.push({ match: { budget_per_head } });
-    }
-
-    if (best_time_to_visit) {
-      mustQueries.push({ match: { best_time_to_visit } });
-    }
-
-    if (parking_available !== undefined) {
-      mustQueries.push({ match: { parking_available: parking_available === "true" } });
-    }
-
-    if (tags) {
-      const tagArray = tags.split(",");
-      mustQueries.push({
-        terms: { tags: tagArray },
-      });
-    }
-
     const searchQuery = {
       index: "places_index",
+      size: 10,
       body: {
         query: {
           bool: {
-            must: mustQueries,
-            should: [
-              {
-                match: {
-                  category: {
-                    query: "Adventure",
-                    boost: 2,
-                  },
-                },
-              },
-              {
-                terms: {
-                  tags: searchKeywords,
-                },
-              },
-            ],
-            
-            minimum_should_match: 1, 
+            must: mustFilters,
+            should: shouldQueries,
+            minimum_should_match: shouldQueries.length ? 1 : 0,
           },
         },
+        sort: [{ _score: { order: "desc" } }],
       },
     };
-    
 
-    const response = await opensearchClient.search(searchQuery);
+    // ❶ — build the ES query (unchanged)
+const esResp = await opensearchClient.search(searchQuery);
 
-    const places = response.body.hits.hits.map((hit) => hit._source);
+// ❷ — robust ID extraction
+const matchedIds = esResp.body.hits.hits
+  .map(h => h._source?.id ?? Number(h._id))   // use _source.id or _id
+  .filter(Boolean);                           // remove undefined / NaN
+
+let places;
+
+// ❸ — fallback runs correctly now
+if (matchedIds.length === 0) {
+  places = await Place.findAll({
+    where: { status: "approved" },
+    limit: 10,
+    order: [["createdAt", "DESC"]],
+    include: [
+      { model: User,     as: "user",     attributes: ["id","first_name","last_name","email"] },
+      { model: Category, as: "category", attributes: ["id","name"] },
+    ],
+  });
+} else {
+  const dbRows = await Place.findAll({
+    where: { id: matchedIds, status: "approved" },
+    include: [
+      { model: User,     as: "user",     attributes: ["id","first_name","last_name","email"] },
+      { model: Category, as: "category", attributes: ["id","name"] },
+    ],
+  });
+
+  const rowMap = Object.fromEntries(dbRows.map(p => [p.id, p]));
+  places = matchedIds.map(id => rowMap[id]).filter(Boolean);
+}
+
+
     return res.status(200).json({ places });
   } catch (error) {
     console.error("Error searching places:", error);
     return res.status(500).json({ error: "Internal server error", details: error.message });
   }
 };
+
 
 
 module.exports = { indexPlaces, searchPlaces };

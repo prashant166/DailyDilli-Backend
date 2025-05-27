@@ -20,7 +20,7 @@ The app supports the following **categories**:
 - Family-friendly
 
 It also supports these **tags**:
-Romantic, Family-Friendly, Budget-Friendly, Luxury, Near Metro, Peaceful, Photogenic, Nature, Historical, Night Views.
+Romantic, Family-Friendly, Budget-Friendly, Luxury, Near Metro, Peaceful, Photogenic, Nature, Historical, Night Views, Pet-Friendly.
 
 A user entered the following search query: "${userQuery}"
 
