@@ -1,30 +1,31 @@
 "use strict";
 
 const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
+const { v2: cloudinary } = require("cloudinary");
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+require("dotenv").config();
 
-// Set up storage destination (only one "uploads" directory)
-const uploadDir = path.join(__dirname, "../uploads");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
+// Cloudinary config
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
-// Multer storage configuration (store files in "uploads" directory)
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir); // Store directly in "uploads"
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    cb(null, uniqueSuffix + path.extname(file.originalname));
+// Multer-Cloudinary storage setup
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: "uploads", // change folder name if needed
+    allowed_formats: ["jpg", "png", "jpeg", "webp"],
+    transformation: [{ quality: "auto" }],
   },
 });
 
-// Multer file filter (accept only images)
+// File filter (optional - Cloudinary also validates)
 const imageFilter = (req, file, cb) => {
   const allowedExtensions = [".png", ".jpg", ".jpeg", ".webp"];
-  const ext = path.extname(file.originalname).toLowerCase();
+  const ext = file.originalname.split(".").pop().toLowerCase();
   if (allowedExtensions.includes(ext)) {
     cb(null, true);
   } else {
@@ -32,11 +33,11 @@ const imageFilter = (req, file, cb) => {
   }
 };
 
-// Multer upload middleware (no compression)
+// Upload middleware using Cloudinary
 const upload = multer({
   storage,
   fileFilter: imageFilter,
-  limits: { fileSize: 5 * 1024 * 1024 }, // Limit file size to 5MB
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
 });
 
 module.exports = { upload };
