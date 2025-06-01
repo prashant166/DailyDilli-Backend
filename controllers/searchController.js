@@ -58,25 +58,41 @@ const searchPlaces = async (req, res) => {
       best_time_to_visit,
     } = req.query;
 
+    console.log("🔍 Incoming search query params:", req.query);
+
     const mustFilters = [];
-    if (category) mustFilters.push({ match: { category } });
-    if (budget_per_head) mustFilters.push({ match: { budget_per_head } });
-    if (best_time_to_visit) mustFilters.push({ match: { best_time_to_visit } });
+    if (category) {
+      mustFilters.push({ match: { category } });
+      console.log("📦 Filtering by category:", category);
+    }
+    if (budget_per_head) {
+      mustFilters.push({ match: { budget_per_head } });
+      console.log("💰 Filtering by budget_per_head:", budget_per_head);
+    }
+    if (best_time_to_visit) {
+      mustFilters.push({ match: { best_time_to_visit } });
+      console.log("🕒 Filtering by best_time_to_visit:", best_time_to_visit);
+    }
 
     if (parking_available !== undefined) {
       mustFilters.push({
         match: { parking_available: parking_available === "true" },
       });
+      console.log("🚗 Filtering by parking_available:", parking_available);
     }
 
     if (tags) {
-      mustFilters.push({ terms: { tags: tags.split(",") } });
+      const tagList = tags.split(",");
+      mustFilters.push({ terms: { tags: tagList } });
+      console.log("🏷️ Filtering by tags:", tagList);
     }
 
     const shouldQueries = [];
     let searchKeywords = [];
 
     if (query) {
+      console.log("🔡 Search text query:", query);
+
       shouldQueries.push({
         match_phrase: {
           name: {
@@ -96,6 +112,7 @@ const searchPlaces = async (req, res) => {
       });
 
       searchKeywords = await expandQueryWithAI(query);
+      console.log("🤖 AI-expanded keywords before filtering:", searchKeywords);
 
       const contradictoryPairs = [
         ["luxury", "budget-friendly"],
@@ -104,18 +121,28 @@ const searchPlaces = async (req, res) => {
       for (const [a, b] of contradictoryPairs) {
         if (searchKeywords.includes(a) && searchKeywords.includes(b)) {
           searchKeywords = searchKeywords.filter((t) => t !== a);
+          console.log(`❌ Removed contradictory keyword: ${a}`);
         }
       }
 
-      if (searchKeywords.length) {
-        shouldQueries.push({
-          terms: { tags: searchKeywords },
-        });
+      for (const keyword of searchKeywords) {
+  shouldQueries.push({
+    match: {
+      tags: {
+        query: keyword,
+        fuzziness: "AUTO",
+      },
+    },
+  });
+
+
+
+        console.log("🔍 Adding AI-based keyword terms to search:", searchKeywords);
       }
     }
 
     const searchQuery = {
-      index: "places_index",
+      index: "places_index_v2",
       size: 10,
       body: {
         query: {
@@ -129,47 +156,49 @@ const searchPlaces = async (req, res) => {
       },
     };
 
-    // ❶ — build the ES query (unchanged)
-const esResp = await opensearchClient.search(searchQuery);
+    console.log("📤 Sending query to OpenSearch:", JSON.stringify(searchQuery, null, 2));
+    const esResp = await opensearchClient.search(searchQuery);
 
-// ❷ — robust ID extraction
-const matchedIds = esResp.body.hits.hits
-  .map(h => h._source?.id ?? Number(h._id))   // use _source.id or _id
-  .filter(Boolean);                           // remove undefined / NaN
+    const matchedIds = esResp?.body?.hits?.hits
+      ?.map(h => h._source?.id ?? Number(h._id))
+      ?.filter(Boolean) || [];
 
-let places;
+    console.log("✅ Matched IDs from OpenSearch:", matchedIds);
 
-// ❸ — fallback runs correctly now
-if (matchedIds.length === 0) {
-  places = await Place.findAll({
-    where: { status: "approved" },
-    limit: 10,
-    order: [["createdAt", "DESC"]],
-    include: [
-      { model: User,     as: "user",     attributes: ["id","first_name","last_name","email"] },
-      { model: Category, as: "category", attributes: ["id","name"] },
-    ],
-  });
-} else {
-  const dbRows = await Place.findAll({
-    where: { id: matchedIds, status: "approved" },
-    include: [
-      { model: User,     as: "user",     attributes: ["id","first_name","last_name","email"] },
-      { model: Category, as: "category", attributes: ["id","name"] },
-    ],
-  });
+    let places;
 
-  const rowMap = Object.fromEntries(dbRows.map(p => [p.id, p]));
-  places = matchedIds.map(id => rowMap[id]).filter(Boolean);
-}
+    if (matchedIds.length === 0) {
+      console.log("⚠️ No matches from OpenSearch, falling back to latest approved places.");
+      places = await Place.findAll({
+        where: { status: "approved" },
+        limit: 10,
+        order: [["createdAt", "DESC"]],
+        include: [
+          { model: User,     as: "user",     attributes: ["id", "first_name", "last_name", "email"] },
+          { model: Category, as: "category", attributes: ["id", "name"] },
+        ],
+      });
+    } else {
+      const dbRows = await Place.findAll({
+        where: { id: matchedIds, status: "approved" },
+        include: [
+          { model: User,     as: "user",     attributes: ["id", "first_name", "last_name", "email"] },
+          { model: Category, as: "category", attributes: ["id", "name"] },
+        ],
+      });
 
+      const rowMap = Object.fromEntries(dbRows.map(p => [p.id, p]));
+      places = matchedIds.map(id => rowMap[id]).filter(Boolean);
+      console.log(`🗃️ Fetched ${places.length} places from DB in OpenSearch order.`);
+    }
 
     return res.status(200).json({ places });
   } catch (error) {
-    console.error("Error searching places:", error);
+    console.error("💥 Error searching places:", error);
     return res.status(500).json({ error: "Internal server error", details: error.message });
   }
 };
+
 
 
 

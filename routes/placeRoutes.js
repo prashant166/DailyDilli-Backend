@@ -15,11 +15,15 @@ router.get("/", placeController.getPlaces);
 router.get("/category/:category", placeController.getPlacesByCategory);
 
 // 📌 Update a place (Only the original contributor or an admin)
-router.put("/:id", authMiddleware, placeController.updatePlace);
+router.put("/:id",placeController.updatePlace);
 
 // 📌 Delete a place (Only the original contributor or an admin)
 router.delete("/:id", authMiddleware, placeController.deletePlace);
 
+router.get("/suggestions", placeController.getSuggestedPlaces);
+
 router.get("/:id", placeController.getPlaceById)
+
+
 
 module.exports = router;

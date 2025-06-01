@@ -1,64 +1,83 @@
 const axios = require("axios");
+require("dotenv").config();
 
-const GOOGLE_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
+const ORS_API_KEY = process.env.ORS_API_KEY;
+if (!ORS_API_KEY) {
+  throw new Error("🚨 ORS_API_KEY is missing. Check your .env file.");
+}
 
-const getTravelTimeBetweenCoords = async (origin, destination, mode = "driving") => {
+/* ------------ helpers ------------------ */
+const parseDuration = (seconds) => Number(seconds) || 0;
+
+const mapToORSProfile = (raw = "") => {
+  const m = raw.toLowerCase();
+  if (["walk", "walking"].includes(m)) return "foot-walking";
+  if (["bicycle", "cycle", "pedal"].includes(m)) return "cycling-regular";
+  if (["two_wheeler", "scooter", "motorbike", "bike_motor"].includes(m)) return "driving-car";
+  return "driving-car"; // default
+};
+
+/* ------------ single-leg call ------------------ */
+const getTravelTimeBetweenCoords = async (
+  origin,
+  destination,
+  mode = "DRIVE"
+) => {
   try {
-    const originStr = `${origin.lat},${origin.lng}`;
-    const destinationStr = `${destination.lat},${destination.lng}`;
+    const profile = mapToORSProfile(mode);
 
-    const response = await axios.get("https://maps.googleapis.com/maps/api/distancematrix/json", {
+    const url = `https://api.openrouteservice.org/v2/directions/${profile}`;
+
+    const { data } = await axios.get(url, {
       params: {
-        origins: originStr,
-        destinations: destinationStr,
-        mode,
-        key: process.env.GOOGLE_MAPS_API_KEY,
+        start: `${origin.lng},${origin.lat}`,
+        end: `${destination.lng},${destination.lat}`,
+      },
+      headers: {
+        Authorization: ORS_API_KEY,
       },
     });
 
-    const data = response.data;
-    console.log("📡 Distance Matrix API raw response:", JSON.stringify(data, null, 2));
+    const summary = data?.features?.[0]?.properties?.summary;
+    if (!summary) throw new Error("Invalid ORS response");
 
-    const element = data.rows?.[0]?.elements?.[0];
-
-    if (element?.status === "OK") {
-      return {
-        distance: element.distance.text,
-        duration: element.duration.text,
-        duration_value: element.duration.value, // in seconds
-      };
-    }
-
-    console.warn("⚠️ No valid travel data returned:", element?.status);
-    return { distance: null, duration: null, duration_value: null };
-  } catch (error) {
-    console.error("❌ Error fetching travel time:", error.message);
-    return { distance: null, duration: null, duration_value: null };
+    const durSec = parseDuration(summary.duration);
+    return {
+      distance: `${(summary.distance / 1000).toFixed(1)} km`,
+      duration: `${Math.round(durSec / 60)} mins`,
+      duration_value: durSec,
+    };
+  } catch (err) {
+    console.error(
+      "❌ ORS error:",
+      err.response?.data || err.message || err
+    );
   }
+  return { distance: null, duration: null, duration_value: null };
 };
 
-
-const getTravelTimesForItinerary = async (places, mode = "driving") => {
+/* ------------ multi-leg helper ------------------ */
+const getTravelTimesForItinerary = async (places, mode = "DRIVE") => {
+  const travelMode = mode; // keep raw for logging or external use
   const travelTimes = [];
 
   for (let i = 0; i < places.length - 1; i++) {
     const origin = { lat: places[i].latitude, lng: places[i].longitude };
-    const destination = { lat: places[i + 1].latitude, lng: places[i + 1].longitude };
+    const dest = { lat: places[i + 1].latitude, lng: places[i + 1].longitude };
 
-    const travelInfo = await getTravelTimeBetweenCoords(origin, destination, mode);
+    const info = await getTravelTimeBetweenCoords(origin, dest, travelMode);
 
     travelTimes.push({
       from: places[i].id,
       to: places[i + 1].id,
-      distance: travelInfo.distance,
-      duration: travelInfo.duration,
-      duration_value: travelInfo.duration_value,
-      map_url: `https://www.google.com/maps/dir/${origin.lat},${origin.lng}/${destination.lat},${destination.lng}/`,
+      distance: info.distance,
+      duration: info.duration,
+      duration_value: info.duration_value,
+      map_url: `https://maps.openrouteservice.org/directions?n1=${origin.lat}&n2=${origin.lng}&n3=14&a=${origin.lat},${origin.lng},${dest.lat},${dest.lng}&b=0&c=0&k1=en-US&k2=km`, // ORS map link
     });
   }
 
   return travelTimes;
 };
-
 
 module.exports = { getTravelTimeBetweenCoords, getTravelTimesForItinerary };

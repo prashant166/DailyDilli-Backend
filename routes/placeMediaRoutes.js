@@ -7,7 +7,7 @@ const authMiddleware = require("../middlewares/authMiddleware");
 // 📌 Upload multiple images for a place
 router.post(
   "/:id/images",
-  authMiddleware,
+  // authMiddleware,
   upload.array("images", 1), // Allow up to 5 images
   placeMediaController.uploadPlaceImages
 );

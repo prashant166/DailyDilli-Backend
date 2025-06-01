@@ -1,23 +1,23 @@
-const { Client } = require("@opensearch-project/opensearch");
+const { Client } = require("@elastic/elasticsearch");
 require("dotenv").config();
 
-const isLocal = process.env.NODE_ENV !== "production"; // Check if running locally
+const isLocal = process.env.NODE_ENV !== "production";
 
-const opensearchClient = new Client({
-  node: isLocal ? "http://localhost:9200" : process.env.OPENSEARCH_URL, // Use local ES in dev mode
+const elasticClient = new Client({
+  node: isLocal ? "http://localhost:9200" : process.env.OPENSEARCH_URL,
+  compatibilityMode: true, // ✅ This enables "compatible-with=8"
   ...(isLocal
-    ? {} // No auth for local
+    ? {}
     : {
         auth: {
-          username: process.env.OS_USERNAME || "", // For AWS OpenSearch
+          username: process.env.OS_USERNAME || "",
           password: process.env.OS_PASSWORD || "",
         },
         ssl: {
-          rejectUnauthorized: false, // Avoid SSL issues
+          rejectUnauthorized: false,
         },
       }),
+  // ❌ REMOVE custom headers if you had them
 });
 
-console.log("Connected to OpenSearch:", isLocal ? "Local" : "AWS");
-
-module.exports = opensearchClient;
+module.exports = elasticClient;

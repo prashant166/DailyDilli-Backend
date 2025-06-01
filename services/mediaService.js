@@ -24,14 +24,14 @@ const storage = new CloudinaryStorage({
 
 // File filter (optional - Cloudinary also validates)
 const imageFilter = (req, file, cb) => {
-  const allowedExtensions = [".png", ".jpg", ".jpeg", ".webp"];
-  const ext = file.originalname.split(".").pop().toLowerCase();
-  if (allowedExtensions.includes(ext)) {
+  const allowedMimeTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+  if (allowedMimeTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
     cb(new Error("Only image files (PNG, JPG, JPEG, WEBP) are allowed"), false);
   }
 };
+
 
 // Upload middleware using Cloudinary
 const upload = multer({
